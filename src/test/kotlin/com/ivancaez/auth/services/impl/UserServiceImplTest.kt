@@ -3,22 +3,29 @@ package com.ivancaez.auth.services.impl
 import com.ivancaez.auth.domain.UserUpdateRequest
 import com.ivancaez.auth.domain.entities.UserEntity
 import com.ivancaez.auth.repositories.UserRepository
+import com.ivancaez.auth.services.TokenService
 import com.ivancaez.auth.testUserEntityA
 import com.ivancaez.auth.testUserEntityB
 import com.ivancaez.auth.testUserUpdateRequest
+import com.ninjasquad.springmockk.MockkBean
 import jakarta.transaction.Transactional
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.*
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 
 @SpringBootTest
 @Transactional
 class UserServiceImplTest @Autowired constructor(
     private val underTest: UserServiceImpl,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val encoder: BCryptPasswordEncoder
 ) {
+
+    @MockkBean
+    private lateinit var tokenService: TokenService
 
     @Nested
     @DisplayName("postRequest()")
@@ -33,7 +40,13 @@ class UserServiceImplTest @Autowired constructor(
             // Then
             assertThat(savedUser.id).isNotNull()
             assertThat(recalledUser).isNotNull()
-            assertThat(recalledUser).isEqualTo(testUserEntityA(id = savedUser.id))
+            // As the password is encoded, we have to check that others fields are equal
+            assertThat(recalledUser?.username).isEqualTo(testUserEntityA().username)
+            assertThat(recalledUser?.email).isEqualTo(testUserEntityA().email)
+            assertThat(recalledUser?.image).isEqualTo(testUserEntityA().image)
+            assertThat(recalledUser?.role).isEqualTo(testUserEntityA().role)
+            // Then that the password matches
+            assertThat(encoder.matches(testUserEntityA().password, recalledUser?.password)).isTrue()
         }
     }
 

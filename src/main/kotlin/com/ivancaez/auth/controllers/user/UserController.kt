@@ -1,4 +1,4 @@
-package com.ivancaez.auth.controllers
+package com.ivancaez.auth.controllers.user
 
 import com.ivancaez.auth.domain.dto.UserDto
 import com.ivancaez.auth.domain.dto.UserUpdateRequestDto
@@ -36,6 +36,13 @@ class UserController(private val userService: UserService) {
     @GetMapping(path = ["/{id}"])
     fun getUserById(@PathVariable("id") id: Long): ResponseEntity<UserDto> {
         val foundUser = userService.getUserById(id)?.toUserDto()
+        return foundUser?.let {
+            ResponseEntity(it, HttpStatus.OK)
+        } ?: ResponseEntity(HttpStatus.NOT_FOUND)
+    }
+    @GetMapping(path = ["/email/{email}"])
+    fun getUserByEmail(@PathVariable("email") email: String): ResponseEntity<UserDto> {
+        val foundUser = userService.getUserByEmail(email)?.toUserDto()
         return foundUser?.let {
             ResponseEntity(it, HttpStatus.OK)
         } ?: ResponseEntity(HttpStatus.NOT_FOUND)

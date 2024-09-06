@@ -6,14 +6,19 @@ import com.ivancaez.auth.repositories.UserRepository
 import com.ivancaez.auth.services.UserService
 import jakarta.transaction.Transactional
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 
 @Service
-class UserServiceImpl(private val userRepository: UserRepository): UserService {
+class UserServiceImpl(
+    private val userRepository: UserRepository,
+    private val encoder: PasswordEncoder
+    ): UserService {
 
     override fun saveUser(userEntity: UserEntity): UserEntity {
         require(userEntity.id == null) { "User ID must be null" }
-        return userRepository.save(userEntity)
+        val userEncoded = userEntity.copy(password = encoder.encode(userEntity.password))
+        return userRepository.save(userEncoded)
     }
 
     override fun getUsers(): List<UserEntity> {
@@ -22,6 +27,10 @@ class UserServiceImpl(private val userRepository: UserRepository): UserService {
 
     override fun getUserById(id: Long): UserEntity? {
         return userRepository.findByIdOrNull(id)
+    }
+
+    override fun getUserByEmail(email: String): UserEntity? {
+        return userRepository.findByEmail(email)
     }
 
     @Transactional

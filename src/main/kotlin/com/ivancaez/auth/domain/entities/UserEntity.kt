@@ -1,5 +1,6 @@
 package com.ivancaez.auth.domain.entities
 
+import com.ivancaez.auth.domain.Role
 import jakarta.persistence.*
 
 @Entity
@@ -16,5 +17,8 @@ data class UserEntity(
     @Column(name = "image")
     val image: String,
     @Column(name = "password")
-    val password: String
+    val password: String,
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role")
+    val role: Role
 )

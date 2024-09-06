@@ -1,12 +1,15 @@
 package com.ivancaez.auth.controllers
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.ivancaez.auth.*
+import com.ivancaez.auth.config.JwtProperties
+import com.ivancaez.auth.domain.auth.AuthRequest
+import com.ivancaez.auth.domain.auth.AuthResponse
 import com.ivancaez.auth.domain.entities.UserEntity
+import com.ivancaez.auth.services.AuthenticationService
+import com.ivancaez.auth.services.CustomUserDetailsService
+import com.ivancaez.auth.services.TokenService
 import com.ivancaez.auth.services.UserService
-import com.ivancaez.auth.testUserDtoA
-import com.ivancaez.auth.testUserEntityA
-import com.ivancaez.auth.testUserEntityB
-import com.ivancaez.auth.testUserUpdateRequestDto
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import io.mockk.verify
@@ -20,21 +23,32 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
+import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.test.web.servlet.*
+import java.util.*
 
 @SpringBootTest
 @AutoConfigureMockMvc
 class UserControllerTest @Autowired constructor(
     val mockMvc: MockMvc,
     val objectMapper: ObjectMapper,
-    @MockkBean val userService: UserService
+    @MockkBean val userService: UserService,
+    @MockkBean val tokenService: TokenService,
+    @MockkBean val authService: AuthenticationService,
+    val jwtProperties: JwtProperties
 ) {
 
+    @MockkBean lateinit var userDetailsService: CustomUserDetailsService
+
     private val baseUrl = "/v1/users"
+    private val authUrl = "/v1/auth"
+
+    lateinit var token: String
 
     @BeforeEach
     fun beforeEach() {
         every { userService.saveUser(any()) } answers { firstArg() }
+        token = createAdminUser()
     }
 
     @Nested
@@ -47,21 +61,15 @@ class UserControllerTest @Autowired constructor(
 
                 val newUser = testUserDtoA()
 
-                val expected = UserEntity(
-                    id = null,
-                    username = "Test User",
-                    email = "test@test.com",
-                    image = "test.jpg",
-                    password = "test"
-                )
+                val expected = testUserEntityA()
 
                 // When
-                val postRequest = mockMvc.post(baseUrl) {
+                mockMvc.post(baseUrl) {
                     contentType = MediaType.APPLICATION_JSON
                     accept = MediaType.APPLICATION_JSON
                     content = objectMapper.writeValueAsString(newUser)
-
-                }.andDo { print() }
+                }
+                    .andDo { print() }
                 // Then
                 verify { userService.saveUser(eq(expected)) }
             }
@@ -77,6 +85,7 @@ class UserControllerTest @Autowired constructor(
                     contentType = MediaType.APPLICATION_JSON
                     accept = MediaType.APPLICATION_JSON
                     content = objectMapper.writeValueAsString(newUser)
+                    header("Authorization", "Bearer $token")
                 }
                 // Then
                 postRequest
@@ -97,6 +106,7 @@ class UserControllerTest @Autowired constructor(
                 contentType = MediaType.APPLICATION_JSON
                 accept = MediaType.APPLICATION_JSON
                 content = objectMapper.writeValueAsString(newUser)
+                header("Authorization", "Bearer $token")
             }
             // Then
             postRequest
@@ -120,6 +130,7 @@ class UserControllerTest @Autowired constructor(
             mockMvc.get(baseUrl){
                 accept = MediaType.APPLICATION_JSON
                 contentType = MediaType.APPLICATION_JSON
+                header("Authorization", "Bearer $token")
             }
                 .andDo { print() }
                 .andExpect {
@@ -135,6 +146,7 @@ class UserControllerTest @Autowired constructor(
             mockMvc.get(baseUrl){
                 accept = MediaType.APPLICATION_JSON
                 contentType = MediaType.APPLICATION_JSON
+                header("Authorization", "Bearer $token")
             }
                 .andDo { print() }
                 .andExpect {
@@ -159,6 +171,7 @@ class UserControllerTest @Autowired constructor(
             mockMvc.get("$baseUrl/222"){
                 accept = MediaType.APPLICATION_JSON
                 contentType = MediaType.APPLICATION_JSON
+                header("Authorization", "Bearer $token")
             }
                 .andDo { print() }
                 .andExpect {
@@ -174,6 +187,7 @@ class UserControllerTest @Autowired constructor(
             mockMvc.get("$baseUrl/999"){
                 accept = MediaType.APPLICATION_JSON
                 contentType = MediaType.APPLICATION_JSON
+                header("Authorization", "Bearer $token")
             }
                 .andDo { print() }
                 .andExpect {
@@ -202,6 +216,7 @@ class UserControllerTest @Autowired constructor(
                 contentType = MediaType.APPLICATION_JSON
                 accept = MediaType.APPLICATION_JSON
                 content = objectMapper.writeValueAsString(userToUpdate)
+                header("Authorization", "Bearer $token")
             }
             putRequest.andDo { print() }
                 .andExpect {
@@ -223,6 +238,7 @@ class UserControllerTest @Autowired constructor(
                 contentType = MediaType.APPLICATION_JSON
                 accept = MediaType.APPLICATION_JSON
                 content = objectMapper.writeValueAsString(userToUpdate)
+                header("Authorization", "Bearer $token")
             }
             putRequest.andDo { print() }
                 .andExpect {
@@ -249,6 +265,7 @@ class UserControllerTest @Autowired constructor(
                 contentType = MediaType.APPLICATION_JSON
                 accept = MediaType.APPLICATION_JSON
                 content = objectMapper.writeValueAsString(userToUpdate)
+                header("Authorization", "Bearer $token")
             }
             patchRequest.andDo { print() }
                 .andExpect {
@@ -270,6 +287,7 @@ class UserControllerTest @Autowired constructor(
                 contentType = MediaType.APPLICATION_JSON
                 accept = MediaType.APPLICATION_JSON
                 content = objectMapper.writeValueAsString(userToUpdate)
+                header("Authorization", "Bearer $token")
             }
             patchRequest.andDo { print() }
                 .andExpect {
@@ -291,11 +309,76 @@ class UserControllerTest @Autowired constructor(
             mockMvc.delete("$baseUrl/999"){
                 accept = MediaType.APPLICATION_JSON
                 contentType = MediaType.APPLICATION_JSON
+                header("Authorization", "Bearer $token")
             }
                 .andDo { print() }
                 .andExpect {
                     status { isNoContent() }
                 }
         }
+    }
+    @Test
+    fun `should return the user with the specified email and 200 when there's a user with provided ID in the database`() {
+        // Given
+        every { userService.getUserByEmail(any()) } answers { testUserEntityA(999) }
+        // When / Then
+
+        mockMvc.get("$baseUrl/email/test@test.com"){
+            accept = MediaType.APPLICATION_JSON
+            contentType = MediaType.APPLICATION_JSON
+            header("Authorization", "Bearer $token")
+        }
+            .andDo { print() }
+            .andExpect {
+                status { isOk() }
+                content {
+                    json(objectMapper.writeValueAsString(testUserEntityA(999)))
+                }
+            }
+    }
+
+    private fun createAdminUser(): String {
+        val adminUser = testAdminUserEntityA()
+        every { userDetailsService.loadUserByUsername(any()) } answers {
+            adminUser.mapToUserDetails()
+        }
+        val user = userDetailsService.loadUserByUsername(adminUser.email)
+
+        every { tokenService.generate(any(), any(), any()) } answers {
+            "TOKEN"
+        }
+
+        every { authService.authenticate(any()) } answers {
+            val authRequest = it.invocation.args[0] as AuthRequest
+            val token = tokenService.generate(user, Date(System.currentTimeMillis() + jwtProperties.expirationMs))
+            AuthResponse(token)
+        }
+
+        every { tokenService.extractEmail(any()) } answers { "admin@test.com" }
+
+        // Creates an admin user
+        mockMvc.post(baseUrl) {
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(adminUser)
+            accept = MediaType.APPLICATION_JSON
+        }.andExpect {
+            status { isCreated() }
+        }
+
+        // Authenticate the admin user to get the token
+        val authRequest = AuthRequest(adminUser.email, adminUser.password)
+
+        val result = mockMvc.post(authUrl) {
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(authRequest)
+            accept = MediaType.APPLICATION_JSON
+        }.andExpect {
+            status { isOk() }
+        }.andReturn()
+
+        // Extrae el token JWT de la respuesta
+        val jsonResponse = result.response.contentAsString
+        println(objectMapper.readTree(jsonResponse).get("accessToken").asText())
+        return objectMapper.readTree(jsonResponse).get("accessToken").asText()
     }
 }
