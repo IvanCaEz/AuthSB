@@ -5,7 +5,6 @@ import com.ivancaez.auth.*
 import com.ivancaez.auth.config.JwtProperties
 import com.ivancaez.auth.domain.auth.AuthRequest
 import com.ivancaez.auth.domain.auth.AuthResponse
-import com.ivancaez.auth.domain.entities.UserEntity
 import com.ivancaez.auth.services.AuthenticationService
 import com.ivancaez.auth.services.CustomUserDetailsService
 import com.ivancaez.auth.services.TokenService
@@ -23,8 +22,11 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
-import org.springframework.security.core.userdetails.UserDetails
+import org.springframework.mock.web.MockMultipartFile
+import org.springframework.security.test.context.support.WithMockUser
 import org.springframework.test.web.servlet.*
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers
 import java.util.*
 
 @SpringBootTest
@@ -48,7 +50,46 @@ class UserControllerTest @Autowired constructor(
     @BeforeEach
     fun beforeEach() {
         every { userService.saveUser(any()) } answers { firstArg() }
-        token = createAdminUser()
+        every { userService.getUserByEmail("test@test.com") } returns testUserEntityA()
+        //token = createAdminUser()
+        every { tokenService.generate(any(), any()) } returns "fake-jwt-token"
+        every { tokenService.extractEmail(any()) } returns "test@test.com"
+
+    }
+
+    @Test
+    @WithMockUser(username = "test@test.com", roles = ["USER"])
+    fun `upload image should update user's profile image`() {
+        // Given
+        //every { userService.patchUser(any(), any()) } answers { testUserEntityB(999) }
+
+        val expected = testUserEntityA(152)
+        val userId = 152L // Asegúrate de que este usuario existe en tu base de datos para la prueba
+
+        // Simula un archivo Multipart
+        val imageFile = MockMultipartFile(
+            "image",
+            "profile.jpg",
+            MediaType.IMAGE_JPEG_VALUE,
+            "test image content".toByteArray()
+        )
+
+        // When / Then
+
+        mockMvc.perform(
+            MockMvcRequestBuilders.multipart("$baseUrl/$userId/upload")
+                .file(imageFile)
+                .with { request ->
+                    request.method = "PATCH"
+                    request
+                }
+                .header("Authorization", "Bearer $token")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+        )
+            .andExpect(MockMvcResultMatchers.status().isOk)
+            .andExpect(MockMvcResultMatchers.jsonPath("$.image").isNotEmpty)
+
+        verify { userService.getUserByEmail("test@test.com") }
     }
 
     @Nested
@@ -75,6 +116,7 @@ class UserControllerTest @Autowired constructor(
             }
 
             @Test
+            @WithMockUser(username = "test@test.com", roles = ["USER"])
             fun `should create User and return IS CREATED status`() {
                 // Given
 
@@ -95,6 +137,7 @@ class UserControllerTest @Autowired constructor(
                     }
             }
         @Test
+        @WithMockUser(username = "testa@test.com", roles = ["USER"])
         fun `should return 400 status when IllegalException is thrown`() {
             // Given
             every { userService.saveUser(any()) } throws IllegalArgumentException()
@@ -123,6 +166,7 @@ class UserControllerTest @Autowired constructor(
     @TestInstance(Lifecycle.PER_CLASS)
     inner class GetUsersTest {
         @Test
+        @WithMockUser(username = "test@test.com", roles = ["USER"])
         fun `should return an empty list when there's no user data in the database`() {
             // Given
             every { userService.getUsers() } answers { emptyList() }
@@ -164,7 +208,8 @@ class UserControllerTest @Autowired constructor(
     @TestInstance(Lifecycle.PER_CLASS)
     inner class GetUserByIdTest {
         @Test
-        fun `should return 404 when there's no user with provided ID in the databse`() {
+        @WithMockUser(username = "test@test.com", roles = ["USER"])
+        fun `should return 404 when there's no user with provided ID in the database`() {
             // Given
             every { userService.getUserById(any()) } answers { null }
             // When / Then
@@ -180,6 +225,7 @@ class UserControllerTest @Autowired constructor(
         }
 
         @Test
+        @WithMockUser(username = "test@test.com", roles = ["USER"])
         fun `should return the user with the specified ID and 200 when there's a user with provided ID in the databse`() {
             // Given
             every { userService.getUserById(any()) } answers { testUserEntityA(999) }
@@ -187,7 +233,7 @@ class UserControllerTest @Autowired constructor(
             mockMvc.get("$baseUrl/999"){
                 accept = MediaType.APPLICATION_JSON
                 contentType = MediaType.APPLICATION_JSON
-                header("Authorization", "Bearer $token")
+                header("Authorization", "Bearer ${generateTestToken()}")
             }
                 .andDo { print() }
                 .andExpect {
@@ -344,9 +390,6 @@ class UserControllerTest @Autowired constructor(
         }
         val user = userDetailsService.loadUserByUsername(adminUser.email)
 
-        every { tokenService.generate(any(), any(), any()) } answers {
-            "TOKEN"
-        }
 
         every { authService.authenticate(any()) } answers {
             val authRequest = it.invocation.args[0] as AuthRequest

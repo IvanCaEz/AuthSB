@@ -8,7 +8,9 @@ import com.ivancaez.auth.toUserEntity
 import com.ivancaez.auth.toUserUpdateRequest
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.multipart.MultipartFile
 import java.lang.IllegalArgumentException
 
 @RestController
@@ -33,6 +35,7 @@ class UserController(private val userService: UserService) {
         return ResponseEntity(users, HttpStatus.OK)
     }
 
+    @PreAuthorize("@securityService.canAccessUserId(#id)")
     @GetMapping(path = ["/{id}"])
     fun getUserById(@PathVariable("id") id: Long): ResponseEntity<UserDto> {
         val foundUser = userService.getUserById(id)?.toUserDto()
@@ -48,6 +51,7 @@ class UserController(private val userService: UserService) {
         } ?: ResponseEntity(HttpStatus.NOT_FOUND)
     }
 
+    @PreAuthorize("@securityService.canAccessUserId(#id)")
     @PutMapping(path = ["/{id}"])
     fun updateUser(@PathVariable("id") id: Long, @RequestBody userDto: UserDto
     ): ResponseEntity<UserDto> {
@@ -58,6 +62,7 @@ class UserController(private val userService: UserService) {
             ResponseEntity(HttpStatus.BAD_REQUEST)
         }
     }
+    @PreAuthorize("@securityService.canAccessUserId(#id)")
     @PatchMapping(path = ["/{id}"])
     fun patchUser(@PathVariable("id") id: Long, @RequestBody userUpdateRequest: UserUpdateRequestDto
     ): ResponseEntity<UserDto> {
@@ -69,6 +74,22 @@ class UserController(private val userService: UserService) {
         }
     }
 
+
+    @PreAuthorize("@securityService.canAccessUserId(#id)")
+    @PatchMapping(path = ["/{id}/upload"])
+    fun uploadUserImage(
+        @PathVariable("id") id: Long,
+        @RequestParam("image") image: MultipartFile
+    ): ResponseEntity<UserDto> {
+        return try {
+            val updatedUser = userService.uploadUserImage(id, image)
+            ResponseEntity(updatedUser.toUserDto(), HttpStatus.OK)
+        } catch (e: IllegalArgumentException) {
+            ResponseEntity(HttpStatus.BAD_REQUEST)
+        }
+    }
+
+    @PreAuthorize("@securityService.canAccessUserId(#id)")
     @DeleteMapping(path = ["/{id}"])
     fun deleteUserById(@PathVariable("id") id: Long): ResponseEntity<Unit> {
         userService.deleteUserById(id)

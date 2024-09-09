@@ -24,12 +24,11 @@ class SecurityConfiguration(
             .csrf { it.disable() }
             .authorizeRequests {
                 it
-                    .requestMatchers("/v1/auth", "/v1/auth/refresh", "/error")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.POST, "/v1/users")
-                    .permitAll()
-                    .requestMatchers("v1/users/**")
-                    .hasRole("ADMIN")
+                    .requestMatchers("/v1/auth", "/v1/auth/refresh", "/error").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/v1/users").permitAll()
+                    .requestMatchers("/v1/users/{id}").access("@securityService.canAccessUserId(#id)")
+                    .requestMatchers(HttpMethod.PATCH,"/v1/users/{id}/upload").access("@securityService.canAccessUserId(#id)")
+                    .requestMatchers("v1/users/**").hasRole("ADMIN")
                     .anyRequest()
                     .fullyAuthenticated()
             }

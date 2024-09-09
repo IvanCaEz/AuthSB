@@ -3,6 +3,7 @@ package com.ivancaez.auth.services.impl
 import com.ivancaez.auth.domain.UserUpdateRequest
 import com.ivancaez.auth.domain.entities.UserEntity
 import com.ivancaez.auth.repositories.UserRepository
+import com.ivancaez.auth.services.FileStorageService
 import com.ivancaez.auth.services.TokenService
 import com.ivancaez.auth.testUserEntityA
 import com.ivancaez.auth.testUserEntityB
@@ -15,12 +16,14 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
+import org.springframework.security.test.context.support.WithMockUser
 
 @SpringBootTest
 @Transactional
 class UserServiceImplTest @Autowired constructor(
     private val underTest: UserServiceImpl,
     private val userRepository: UserRepository,
+    private val fileStorageService: FileStorageService,
     private val encoder: BCryptPasswordEncoder
 ) {
 
@@ -113,6 +116,7 @@ class UserServiceImplTest @Autowired constructor(
     @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     inner class PutRequestTests {
         @Test
+        @WithMockUser(username = "test@test.com", roles = ["USER"])
         fun `put request successfully updates an user in the database`() {
             // Given
             val existingUser = userRepository.save(testUserEntityA())
@@ -157,6 +161,7 @@ class UserServiceImplTest @Autowired constructor(
         }
 
         @Test
+        @WithMockUser(username = "test@test.com", roles = ["USER"])
         fun `patch request does not update user when all values are null`() {
             // Given
             val existingUser = userRepository.save(testUserEntityA())
@@ -168,6 +173,7 @@ class UserServiceImplTest @Autowired constructor(
         }
 
         @Test
+        @WithMockUser(username = "test@test.com", roles = ["USER"])
         fun `patch request updates a user's username `() {
             val newName = "New Name"
             val existingUser = testUserEntityA()
@@ -177,6 +183,7 @@ class UserServiceImplTest @Autowired constructor(
         }
 
         @Test
+        @WithMockUser(username = "test@test.com", roles = ["USER"])
         fun `patch request updates a user's email `() {
             val newEmail = "updatedEmail@test.com"
             val existingUser = testUserEntityA()
@@ -186,6 +193,7 @@ class UserServiceImplTest @Autowired constructor(
         }
 
         @Test
+        @WithMockUser(username = "test@test.com", roles = ["USER"])
         fun `patch request updates a user's image `() {
             val newImage = "updated-image.jpg"
             val existingUser = testUserEntityA()
@@ -195,6 +203,7 @@ class UserServiceImplTest @Autowired constructor(
         }
 
         @Test
+        @WithMockUser(username = "test@test.com", roles = ["USER"])
         fun `patch request updates a user's password `() {
             val newPassword = "newPassword9"
             val existingUser = testUserEntityA()
