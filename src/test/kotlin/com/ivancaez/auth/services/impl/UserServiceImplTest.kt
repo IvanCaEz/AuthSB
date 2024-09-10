@@ -2,6 +2,7 @@ package com.ivancaez.auth.services.impl
 
 import com.ivancaez.auth.domain.UserUpdateRequest
 import com.ivancaez.auth.domain.entities.UserEntity
+import com.ivancaez.auth.repositories.RefreshTokenRepository
 import com.ivancaez.auth.repositories.UserRepository
 import com.ivancaez.auth.services.FileStorageService
 import com.ivancaez.auth.services.TokenService
@@ -24,7 +25,8 @@ class UserServiceImplTest @Autowired constructor(
     private val underTest: UserServiceImpl,
     private val userRepository: UserRepository,
     private val fileStorageService: FileStorageService,
-    private val encoder: BCryptPasswordEncoder
+    private val encoder: BCryptPasswordEncoder,
+    private val refreshTokenRepository: RefreshTokenRepository
 ) {
 
     @MockkBean

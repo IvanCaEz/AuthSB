@@ -394,7 +394,8 @@ class UserControllerTest @Autowired constructor(
         every { authService.authenticate(any()) } answers {
             val authRequest = it.invocation.args[0] as AuthRequest
             val token = tokenService.generate(user, Date(System.currentTimeMillis() + jwtProperties.expirationMs))
-            AuthResponse(token)
+            val refreshToken = tokenService.generate(user, Date(System.currentTimeMillis() + jwtProperties.refreshTokenExpirationMs))
+            AuthResponse(token, refreshToken)
         }
 
         every { tokenService.extractEmail(any()) } answers { "admin@test.com" }
