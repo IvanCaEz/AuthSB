@@ -11,4 +11,9 @@ class SecurityService(private val userService: UserService) {
         val currentUser = userService.getUserByEmail(authentication.name)
         return currentUser?.id == id || authentication.authorities.any { it.authority == "ROLE_ADMIN" }
     }
+    fun canAccessUserEmail(email: String): Boolean {
+        val authentication = SecurityContextHolder.getContext().authentication
+        val currentUser = userService.getUserByEmail(authentication.name)
+        return currentUser?.email == email || authentication.authorities.any { it.authority == "ROLE_ADMIN" }
+    }
 }

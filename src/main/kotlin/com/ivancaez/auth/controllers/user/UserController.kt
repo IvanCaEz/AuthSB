@@ -43,6 +43,8 @@ class UserController(private val userService: UserService) {
             ResponseEntity(it, HttpStatus.OK)
         } ?: ResponseEntity(HttpStatus.NOT_FOUND)
     }
+
+    @PreAuthorize("@securityService.canAccessUserEmail(#email)")
     @GetMapping(path = ["/email/{email}"])
     fun getUserByEmail(@PathVariable("email") email: String): ResponseEntity<UserDto> {
         val foundUser = userService.getUserByEmail(email)?.toUserDto()
